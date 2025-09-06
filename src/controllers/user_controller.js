@@ -21,7 +21,7 @@ const userRegister = asyncHandler(async (req, res) => {
         throw new ApiError("All fields are required", 400);
     }
 
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [{ email }, { username }]
     });
     if(existedUser){
@@ -29,9 +29,14 @@ const userRegister = asyncHandler(async (req, res) => {
     }
 
     const avatarLocalPath = req.files?.avatar?.[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
+    // const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
 
-    console.log(avatarLocalPath, coverImageLocalPath);
+    let coverImageLocalPath;
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+        coverImageLocalPath = req.files.coverImage[0].path;
+    }
+
+    // console.log(avatarLocalPath, coverImageLocalPath);
 
     if(!avatarLocalPath){
         throw new ApiError("Avatar image is required", 400);
@@ -44,7 +49,7 @@ const userRegister = asyncHandler(async (req, res) => {
         throw new ApiError("Error uploading avatar image. Please try again", 500);
     }
 
-    const user = awaitUser.create({
+    const user = await User.create({
         username: username.toLowerCase(),
         email: email,
         fullname: fullname,
@@ -60,9 +65,9 @@ const userRegister = asyncHandler(async (req, res) => {
 
     return res.status(201).json(
         new ApiResponse(
-            200,
             createdUser,
-            "User registered successfully"
+            "User registered successfully",
+            200
         )
     );
 });
