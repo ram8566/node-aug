@@ -4,6 +4,7 @@ import { User } from '../models/user_modal.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import jwt from 'jsonwebtoken';
+import { Aggregate } from 'mongoose';
 
 const generateAccessAndRefreshToken = async (userID) => {
     try {
@@ -323,6 +324,74 @@ const updateUsercoverImage = asyncHandler( async ( req, res) => {
         )
     );
 });
+
+const getUserChannelProfile = asyncHandler( async (req, resp) =>{
+    const { username } = req.params;
+    
+    if(!username?.trim()){
+        throw new ApiError("User not found", 404);
+    }
+
+    const channel = await Aggregate([
+        {
+            $match: { username: username.toLowerCase() }
+            
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: { $size: "$subscribers" },
+                channelSubscribedToCount: { $size: "$subscribedTo" },
+                isSubscribed: {
+                    $cond: {
+                        if: { 
+                            $in: [ req.user?._id || null, "$subscribers.subscriber" ] 
+                        },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                fullname: 1,
+                username: 1,
+                isSubscribed: 1,
+                channelSubscribedToCount: 1,
+                subscribersCount: 1,
+                avatar: 1,
+                coverImage: 1
+            }
+        }
+    ]);
+
+    if(!channel.length){
+        throw new ApiError("User not found", 404);
+    }
+    return resp.status(200).json(
+        new ApiResponse(
+            { channel: channel[0] },
+            "User channel profile fetched successfully",
+            200
+        )
+    );
+})
 
 export { userRegister, 
         loginUser, 
